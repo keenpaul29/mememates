@@ -7,12 +7,22 @@ export interface ApiError {
   errors?: string[];
 }
 
+type ErrorWithMessage = {
+  message: string;
+  isAxiosError?: boolean;
+};
+
+interface ApiResponse {
+  message?: string;
+  errors?: Record<string, string[]>;
+}
+
 export class ErrorHandler {
   // Handle generic errors
-  static handleError(error: any): ApiError {
+  static handleError(error: ErrorWithMessage): ApiError {
     // Axios error handling
     if (error.isAxiosError) {
-      return this.handleAxiosError(error);
+      return this.handleAxiosError(error as AxiosError);
     }
 
     // Network error
@@ -35,7 +45,7 @@ export class ErrorHandler {
   }
 
   // Specific Axios error handling
-  private static handleAxiosError(error: AxiosError): ApiError {
+  private static handleAxiosError(error: AxiosError<ApiResponse>): ApiError {
     // No response received
     if (!error.response) {
       toast.error('No response from server. Please try again.');
@@ -46,16 +56,16 @@ export class ErrorHandler {
     }
 
     const { response } = error;
-    const data = response.data as any;
+    const data = response.data;
 
     // Specific error handling based on status code
     switch (response.status) {
       case 400:
-        toast.error(data.message || 'Bad Request');
+        toast.error(data?.message || 'Bad Request');
         return {
-          message: data.message || 'Bad Request',
+          message: data?.message || 'Bad Request',
           status: 400,
-          errors: data.errors
+          errors: data?.errors ? Object.values(data.errors).flat() : undefined
         };
 
       case 401:
@@ -81,7 +91,7 @@ export class ErrorHandler {
         };
 
       case 422:
-        const validationErrors = data.errors 
+        const validationErrors = data?.errors 
           ? Object.values(data.errors).flat() 
           : ['Validation failed'];
         toast.error(validationErrors[0]);
@@ -99,9 +109,9 @@ export class ErrorHandler {
         };
 
       default:
-        toast.error(data.message || 'An unexpected error occurred');
+        toast.error(data?.message || 'An unexpected error occurred');
         return {
-          message: data.message || 'An unexpected error occurred',
+          message: data?.message || 'An unexpected error occurred',
           status: response.status
         };
     }
@@ -115,13 +125,13 @@ export class ErrorHandler {
 }
 
 // Utility for async error handling
-export const asyncErrorHandler = (
-  fn: (...args: any[]) => Promise<any>
-) => async (...args: any[]) => {
+export const asyncErrorHandler = <TArgs extends unknown[], TReturn>(
+  fn: (...args: TArgs) => Promise<TReturn>
+) => async (...args: TArgs): Promise<TReturn> => {
   try {
     return await fn(...args);
   } catch (error) {
-    ErrorHandler.handleError(error);
+    ErrorHandler.handleError(error as ErrorWithMessage);
     throw error;
   }
 };

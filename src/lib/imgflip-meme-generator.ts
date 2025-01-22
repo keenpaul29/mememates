@@ -138,7 +138,8 @@ export class ImgflipMemeGenerator {
   }
 }
 
-// Example usage
+// Example usage - commented out to avoid unused function warning
+/*
 async function exampleMemeGeneration() {
   try {
     const memeGenerator = new ImgflipMemeGenerator();
@@ -151,19 +152,15 @@ async function exampleMemeGeneration() {
     const drakeTemplates = await memeGenerator.searchMemeTemplates('drake');
     console.log('Drake Templates:', drakeTemplates);
 
-    // Generate a meme (Drake meme example)
-    if (drakeTemplates.length > 0) {
-      const memeUrl = await memeGenerator.generateMeme({
-        templateId: drakeTemplates[0].id,
-        topText: 'Boring Meme Generation',
-        bottomText: 'Imgflip API Meme Generation'
-      });
-      console.log('Generated Meme URL:', memeUrl);
-    }
+    // Generate a meme
+    const memeUrl = await memeGenerator.generateMeme({
+      templateId: drakeTemplates[0].id,
+      topText: 'Writing code without types',
+      bottomText: 'Using TypeScript'
+    });
+    console.log('Generated Meme URL:', memeUrl);
   } catch (error) {
-    console.error('Meme Generation Error:', error);
+    console.error('Error:', error);
   }
 }
-
-// Uncomment to test
-// exampleMemeGeneration();
+*/

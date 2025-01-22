@@ -2,7 +2,8 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import bcrypt from 'bcryptjs';
-import { NextAuthOptions } from "next-auth";
+import { NextAuthOptions, Session } from "next-auth/next";
+import { JWT } from "next-auth/jwt";
 import { prisma } from "./prisma";
 
 export const authOptions: NextAuthOptions = {
@@ -67,7 +68,7 @@ export const authOptions: NextAuthOptions = {
     error: '/login'
   },
   callbacks: {
-    async session({ session, token }) {
+    async session({ session, token }: { session: Session; token: any }) {
       if (token) {
         session.user.id = token.id?.toString() ?? '';
         session.user.name = token.name ?? '';
@@ -76,7 +77,7 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
-    async jwt({ token, user, account, profile, trigger }) {
+    async jwt({ token, user, account, profile, trigger }: { token: JWT; user: any; account: any; profile: any; trigger: any }) {
       if (user) {
         token.id = user.id;
         token.name = user.name;
@@ -106,7 +107,7 @@ export const authOptions: NextAuthOptions = {
       
       return token;
     },
-    async redirect({ url, baseUrl }) {
+    async redirect({ url, baseUrl }: { url: string; baseUrl: string }) {
       // Always redirect to discover unless explicitly set
       if (url.includes('/onboarding')) {
         return `${baseUrl}/onboarding`;
