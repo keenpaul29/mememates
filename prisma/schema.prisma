@@ -1,0 +1,192 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+  APPLE
+  PHONE
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  NON_BINARY
+  OTHER
+}
+
+enum MoodBoardItemType {
+  MEME
+  PHOTO
+  GIF
+}
+
+enum PreferenceType {
+  DATING
+  FRIENDSHIP
+  NETWORKING
+}
+
+enum SubscriptionTier {
+  FREE
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+enum ConnectionStatus {
+  PENDING
+  MATCHED
+  BLOCKED
+}
+
+enum PremiumFeatureType {
+  AI_MATCH
+  CUSTOM_ANTHEM
+  FEATURED_PROFILE
+  MEME_TEMPLATE
+  UNLIMITED_LIKES
+}
+
+model User {
+  id                String           @id @default(cuid())
+  email             String?          @unique
+  phone             String?          @unique
+  authProvider      AuthProvider     @default(EMAIL)
+  name              String
+  age               Int
+  gender            Gender
+  bio               String?
+  location          String?
+  interests         String[]
+  profilePhotos     String[]
+  
+  // Authentication & Security
+  password          String?
+  emailVerified     Boolean          @default(false)
+  phoneVerified     Boolean          @default(false)
+  
+  // Preferences
+  preferredGenders  Gender[]
+  preferenceType    PreferenceType   @default(DATING)
+  ageRangeMin       Int?
+  ageRangeMax       Int?
+  
+  // Mood Board & Profile
+  moodBoard         MoodBoardItem[]
+  anthem           Anthem?
+  
+  // Connections & Interactions
+  likedProfiles     UserConnection[] @relation("UserLikes")
+  matchedProfiles   UserConnection[] @relation("UserMatches")
+  sentMemes         Meme[]           @relation("SentMemes")
+  receivedMemes     Meme[]           @relation("ReceivedMemes")
+  
+  // Subscription & Premium
+  subscriptionTier  SubscriptionTier @default(FREE)
+  premiumFeatures   PremiumFeature[]
+  
+  // Streaks & Engagement
+  dailyStreak       Int              @default(0)
+  lastActiveAt      DateTime         @default(now())
+  
+  // Timestamps
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  
+  // Simplified relation
+  notificationPreferences  NotificationPreference?
+}
+
+model MoodBoardItem {
+  id        String             @id @default(cuid())
+  user      User               @relation(fields: [userId], references: [id])
+  userId    String
+  type      MoodBoardItemType
+  url       String
+  caption   String?
+  tags      String[]
+  
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+}
+
+model Anthem {
+  id          String   @id @default(cuid())
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String   @unique
+  
+  spotifyId   String?
+  name        String
+  artist      String
+  albumArt    String?
+  previewUrl  String?
+  
+  selectedSegment Json?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model UserConnection {
+  id            String   @id @default(cuid())
+  initiator     User     @relation("UserLikes", fields: [initiatorId], references: [id])
+  initiatorId   String
+  recipient     User     @relation("UserMatches", fields: [recipientId], references: [id])
+  recipientId   String
+  
+  status        ConnectionStatus
+  matchedAt     DateTime?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([initiatorId, recipientId])
+}
+
+model Meme {
+  id            String   @id @default(cuid())
+  sender        User     @relation("SentMemes", fields: [senderId], references: [id])
+  senderId      String
+  recipient     User     @relation("ReceivedMemes", fields: [recipientId], references: [id])
+  recipientId   String
+  
+  url           String
+  caption       String?
+  tags          String[]
+  
+  createdAt     DateTime @default(now())
+}
+
+model PremiumFeature {
+  id            String   @id @default(cuid())
+  user          User     @relation(fields: [userId], references: [id])
+  userId        String
+  
+  type          PremiumFeatureType
+  expiresAt     DateTime?
+  
+  createdAt     DateTime @default(now())
+}
+
+model NotificationPreference {
+  id            String   @id @default(cuid())
+  user          User     @relation(fields: [userId], references: [id])
+  userId        String   @unique
+  
+  matchNotifications     Boolean @default(true)
+  memeStreakReminders    Boolean @default(true)
+  profileActivityUpdates Boolean @default(true)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
