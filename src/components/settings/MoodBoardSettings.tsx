@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 
@@ -19,9 +21,63 @@ interface MoodBoardSettingsProps {
   onSave: (data: { moodBoard: MoodBoardItem[] }) => void;
 }
 
+function SortableItem({ item }: { item: MoodBoardItem }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className="relative group touch-none"
+    >
+      <div className="relative aspect-[3/2] rounded-lg overflow-hidden">
+        <Image
+          src={item.url}
+          alt="Mood board item"
+          className="object-cover"
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+        />
+        <Button
+          type="button"
+          variant="destructive"
+          size="icon"
+          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={(e) => {
+            e.stopPropagation();
+            document.dispatchEvent(new CustomEvent('remove-item', { detail: item.id }));
+          }}
+        >
+          <XMarkIcon className="w-4 h-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function MoodBoardSettings({ initialData = [], onSave }: MoodBoardSettingsProps) {
   const [items, setItems] = useState<MoodBoardItem[]>(initialData);
   const [uploading, setUploading] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -63,20 +119,36 @@ export function MoodBoardSettings({ initialData = [], onSave }: MoodBoardSetting
     setItems((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const handleDragEnd = (result: any) => {
-    if (!result.destination) return;
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
 
-    const newItems = Array.from(items);
-    const [reorderedItem] = newItems.splice(result.source.index, 1);
-    newItems.splice(result.destination.index, 0, reorderedItem);
+    if (active.id !== over.id) {
+      setItems((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
 
-    setItems(newItems);
+        const newItems = [...items];
+        const [movedItem] = newItems.splice(oldIndex, 1);
+        newItems.splice(newIndex, 0, movedItem);
+
+        return newItems;
+      });
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave({ moodBoard: items });
   };
+
+  // Setup event listener for remove item
+  useState(() => {
+    const handleRemoveEvent = (e: CustomEvent) => handleRemoveItem(e.detail);
+    document.addEventListener('remove-item', handleRemoveEvent as EventListener);
+    return () => {
+      document.removeEventListener('remove-item', handleRemoveEvent as EventListener);
+    };
+  });
 
   return (
     <form onSubmit={handleSubmit}>
@@ -109,54 +181,22 @@ export function MoodBoardSettings({ initialData = [], onSave }: MoodBoardSetting
           </div>
 
           <ScrollArea className="h-[400px] rounded-md border p-4">
-            <DragDropContext onDragEnd={handleDragEnd}>
-              <Droppable droppableId="mood-board">
-                {(provided) => (
-                  <div
-                    {...provided.droppableProps}
-                    ref={provided.innerRef}
-                    className="space-y-4"
-                  >
-                    {items.map((item, index) => (
-                      <Draggable
-                        key={item.id}
-                        draggableId={item.id}
-                        index={index}
-                      >
-                        {(provided) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            className="relative group"
-                          >
-                            <div className="relative aspect-[3/2] rounded-lg overflow-hidden">
-                              <Image
-                                src={item.url}
-                                alt="Mood board item"
-                                className="object-cover"
-                                fill
-                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                              />
-                              <Button
-                                type="button"
-                                variant="destructive"
-                                size="icon"
-                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => handleRemoveItem(item.id)}
-                              >
-                                <XMarkIcon className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </Draggable>
-                    ))}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </DragDropContext>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={items}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-4">
+                  {items.map((item) => (
+                    <SortableItem key={item.id} item={item} />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           </ScrollArea>
         </CardContent>
       </Card>
