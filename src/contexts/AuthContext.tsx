@@ -11,6 +11,7 @@ interface AuthContextType {
   isLoading: boolean;
   signIn: (provider?: string) => Promise<void>;
   signOut: () => Promise<void>;
+  updateProfile: (data: any) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -20,6 +21,7 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   signIn: async () => {},
   signOut: async () => {},
+  updateProfile: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -53,13 +55,34 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await signOut();
   };
 
+  const handleUpdateProfile = async (data: any) => {
+    try {
+      const response = await fetch('/api/profiles/update', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update profile');
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+  };
+
   const value = {
     user: session?.user || null,
     token,
-    isAuthenticated: !!session,
+    isAuthenticated: !!session?.user,
     isLoading: status === 'loading',
     signIn: handleSignIn,
     signOut: handleSignOut,
+    updateProfile: handleUpdateProfile,
   };
 
   return (
